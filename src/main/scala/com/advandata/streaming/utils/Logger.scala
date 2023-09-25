@@ -1,4 +1,4 @@
-package com.advandata.movielens.streaming.utils
+package com.advandata.streaming.utils
 
 trait Logger {
 

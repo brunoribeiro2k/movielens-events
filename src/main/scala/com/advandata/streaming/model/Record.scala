@@ -1,4 +1,4 @@
-package com.advandata.movielens.streaming.model
+package com.advandata.streaming.model
 
 import java.time.Instant
 

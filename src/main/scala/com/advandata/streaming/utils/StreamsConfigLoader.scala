@@ -1,10 +1,10 @@
-package com.advandata.movielens.streaming.utils
+package com.advandata.streaming.utils
 
 import com.typesafe.config.Config
+import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.streams.StreamsConfig
 
 import java.util.Properties
-import org.apache.kafka.streams.StreamsConfig
-import org.apache.kafka.clients.consumer.ConsumerConfig
 
 object StreamsConfigLoader {
 
