@@ -10,7 +10,7 @@ from confluent_kafka.avro import AvroProducer
 def parse_args():
     parser = argparse.ArgumentParser(description='Publish CSV records to a Kafka topic.')
     parser.add_argument('--delta-minutes', '-d', default=2, type=int, help='Minutes to shift timestamps')
-    parser.add_argument('--input-file', '-i', default='ml-latest-small/ratings.csv', help='Path to the CSV input file')
+    parser.add_argument('--input-file', '-i', default='../resources/ml-latest-small/ratings.csv', help='Path to the CSV input file')
     parser.add_argument('--output-topic', '-o', default='user-ratings-4', help='Output Kafka topic')
     return parser.parse_args()
 
