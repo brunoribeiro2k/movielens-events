@@ -7,12 +7,15 @@ import json
 from datetime import datetime, timedelta
 from confluent_kafka.avro import AvroProducer
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Publish CSV records to a Kafka topic.')
     parser.add_argument('--delta-minutes', '-d', default=2, type=int, help='Minutes to shift timestamps')
-    parser.add_argument('--input-file', '-i', default='ml-latest-small/ratings.csv', help='Path to the CSV input file')
+    parser.add_argument('--input-file', '-i', default='../resources/ml-latest-small/ratings.csv',
+                        help='Path to the CSV input file')
     parser.add_argument('--output-topic', '-o', default='user-ratings-4', help='Output Kafka topic')
     return parser.parse_args()
+
 
 def transform_timestamps(df, start_time_adjusted, end_time_adjusted):
     start_time_adjusted_ts = start_time_adjusted.timestamp()
@@ -23,13 +26,15 @@ def transform_timestamps(df, start_time_adjusted, end_time_adjusted):
     end_time_data_ts = df['timestamp'].max()
     delta_data_ts = end_time_data_ts - start_time_data_ts
 
-    df['timestamp'] = ((df['timestamp'] - start_time_data_ts) / delta_data_ts * delta_adjusted_ts + start_time_adjusted_ts) * 1000
+    df['timestamp'] = ((df[
+                            'timestamp'] - start_time_data_ts) / delta_data_ts * delta_adjusted_ts + start_time_adjusted_ts) * 1000
     df['timestamp'] = df['timestamp'].astype(int)
     return df
 
 
 def setup_producer():
     # Avro schema
+    # key schema not used due to streams dependency confusing key and value schemas
     key_schema_str = json.dumps({
         "namespace": "ratings",
         "type": "record",
@@ -65,6 +70,7 @@ def setup_producer():
 
     return producer
 
+
 def send_batch(producer, batch, output_topic):
     for value in batch:
         producer.produce(
@@ -72,6 +78,7 @@ def send_batch(producer, batch, output_topic):
             # key=dict(userId=value['userId']),
             value=value
         )
+
 
 def manage_loop(df, producer, output_topic):
     record_count = 0
@@ -83,7 +90,7 @@ def manage_loop(df, producer, output_topic):
             batch = past_rows.to_dict('records')
             send_batch(producer, batch, output_topic)
             record_count += len(batch)
-            
+
             df = df[df['timestamp'] > current_utc_ts]
             producer.flush()
             print(f"Sent {record_count} records.")
@@ -93,17 +100,18 @@ def manage_loop(df, producer, output_topic):
 
 def main():
     args = parse_args()
-    
+
     df = pd.read_csv(args.input_file)
     start_time_adjusted = datetime.utcnow()
     end_time_adjusted = start_time_adjusted + timedelta(minutes=args.delta_minutes)
 
     df = transform_timestamps(df, start_time_adjusted, end_time_adjusted)
     producer = setup_producer()
-    
+
     print(f"Started publishing records at {start_time_adjusted}")
     manage_loop(df, producer, args.output_topic)
     print(f"Finished publishing records at {datetime.utcnow()}")
+
 
 if __name__ == "__main__":
     main()
