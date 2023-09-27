@@ -1,6 +1,6 @@
 package com.advandata.movielens.streaming
 
-import com.advandata.movielens.model.{AggHistory, MovieRating, UserRating}
+import com.advandata.movielens.model.{UserRating, UserRatingHistory}
 import com.advandata.streaming.utils.{Logger, StreamsConfigLoader}
 import com.moleike.kafka.streams.avro.generic.Serdes.{Config => SRConfig, _}
 import com.typesafe.config
@@ -43,30 +43,22 @@ object UserRatingsProcessor extends Logger {
       .stream[String, UserRating]("user-ratings-4")
       .map { case (_, v) => (v.userId.toString, v) }
 
-    ratingStream.foreach((k, v) => logger.info(s"ratingStream [$k] -> $v"))
+    // ratingStream.foreach((k, v) => logger.debug(s"ratingStream [$k] -> $v"))
 
-    val historyStream: KTable[String, AggHistory] = ratingStream
+    val windowedRatingStream: TimeWindowedKStream[String, UserRating] = ratingStream
       .groupByKey
-      .aggregate(AggHistory.empty) { case (_, v, vr) =>
-        val newRating = MovieRating(v.movieId, v.rating, v.timestamp)
-        val newRatingsSet = vr.movieRatings + newRating
-        val nrNonEmpty = newRatingsSet.nonEmpty
-        val avgRating = if (nrNonEmpty) newRatingsSet.map(_.rating).sum / newRatingsSet.size else 0
-        val topRating = if (nrNonEmpty) Some(newRatingsSet.maxBy(_.rating)) else None
-        val lastRating = if (nrNonEmpty) Some(newRatingsSet.maxBy(_.timestamp)) else None
-        AggHistory(
-          processingCount = vr.processingCount + 1,
-          userId = v.userId,
-          movieRatings = newRatingsSet,
-          ratingsCount = newRatingsSet.size,
-          avg = avgRating,
-          top = topRating,
-          last = lastRating
-        )
+      .windowedBy(window)
+
+    val historyTable = windowedRatingStream
+      .aggregate(UserRatingHistory.empty) { case (_, newRating, userRatingHistory) =>
+        userRatingHistory.addRating(newRating)
       }
 
+    val historyStream = historyTable
+      .toStream
+      .map { case (k, v) => (k.key, v) }
 
-    historyStream.toStream.to("user-ratings-history-4")
+    historyStream.to("user-ratings-history-4")
 
     // Build and start streams
     val streamsTopology = streamsBuilder.build
