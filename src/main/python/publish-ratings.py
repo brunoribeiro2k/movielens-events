@@ -1,6 +1,7 @@
 #!/bin/python
 
 import argparse
+import numpy as np
 import pandas as pd
 import time
 import json
@@ -18,17 +19,18 @@ def parse_args():
 
 
 def transform_timestamps(df, start_time_adjusted, end_time_adjusted):
-    start_time_adjusted_ts = start_time_adjusted.timestamp()
-    end_time_adjusted_ts = end_time_adjusted.timestamp()
-    delta_adjusted_ts = end_time_adjusted_ts - start_time_adjusted_ts
+    start_time_adjusted_ts = int(start_time_adjusted.timestamp() * 1000)
+    end_time_adjusted_ts = int(end_time_adjusted.timestamp() * 1000)
 
-    start_time_data_ts = df['timestamp'].min()
-    end_time_data_ts = df['timestamp'].max()
-    delta_data_ts = end_time_data_ts - start_time_data_ts
+    # Generate random timestamps within the time range
+    random_timestamps = np.random.randint(start_time_adjusted_ts, end_time_adjusted_ts, df.shape[0])
 
-    df['timestamp'] = ((df[
-                            'timestamp'] - start_time_data_ts) / delta_data_ts * delta_adjusted_ts + start_time_adjusted_ts) * 1000
-    df['timestamp'] = df['timestamp'].astype(int)
+    # Sort the random timestamps
+    sorted_timestamps = np.sort(random_timestamps)
+
+    # Assign sorted random timestamps to the DataFrame
+    df['timestamp'] = sorted_timestamps
+
     return df
 
 
@@ -81,6 +83,7 @@ def send_batch(producer, batch, output_topic):
 
 
 def manage_loop(df, producer, output_topic):
+    total_count = df.shape[0]
     record_count = 0
     while not df.empty:
         current_utc_ts = int(datetime.utcnow().timestamp() * 1000)  # Convert this to UNIX milliseconds as well
@@ -89,11 +92,15 @@ def manage_loop(df, producer, output_topic):
         if not past_rows.empty:
             batch = past_rows.to_dict('records')
             send_batch(producer, batch, output_topic)
-            record_count += len(batch)
+
+            batch_count = len(batch)
+            record_count += batch_count
+
+            current_time_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"{current_time_str} - {batch_count} rows sent ({record_count}/{total_count})")
 
             df = df[df['timestamp'] > current_utc_ts]
             producer.flush()
-            print(f"Sent {record_count} records.")
 
         time.sleep(1)
 
