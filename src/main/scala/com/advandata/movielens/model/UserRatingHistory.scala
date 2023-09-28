@@ -22,7 +22,7 @@ case class UserRatingHistory(userId: Int,
       case _ => None
     }
     UserRatingHistory(
-      userId = userId,
+      userId = ur.userId,
       processingCount = newProcessingCount,
       ratingsCount = newRatingsSet.size,
       secondsBetweenRatings = newSecondsBetweenRatings,
